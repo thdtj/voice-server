@@ -12,14 +12,17 @@ const io = new Server(server, {
 });
 
 app.get("/", (req, res) => {
-  res.send("Voice server is running!");
+  res.send("Voice server is up!");
 });
 
 io.on("connection", (socket) => {
   console.log("User connected");
 
-  socket.on("send-voice", (audioChunk) => {
-    socket.broadcast.emit("receive-voice", audioChunk);
+  socket.onAny((event, audioChunk) => {
+    if (event.startsWith("send-voice-")) {
+      const room = event.replace("send-voice-", "");
+      socket.broadcast.emit(`receive-voice-${room}`, audioChunk);
+    }
   });
 
   socket.on("disconnect", () => {
