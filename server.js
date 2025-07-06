@@ -10,60 +10,62 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// پوشه‌ها
+// ایجاد پوشه‌ها (در صورت نبود)
 fs.mkdirSync("uploads", { recursive: true });
 fs.mkdirSync("data", { recursive: true });
 
-// تنظیمات ذخیره عکس
+// ذخیره رسیدها
 const upload = multer({ dest: "uploads/" });
 
-// تست سلامت سرور
+// تست سرور
 app.get("/", (req, res) => {
   res.send("✅ Bot backend server is running.");
 });
 
-// ذخیره شماره تلفن
+// دریافت و ذخیره شماره تلفن
 app.post("/submit", (req, res) => {
-  const { phone, note } = req.body;
+  const { phone } = req.body;
   if (!phone) return res.status(400).send("Phone number is required");
 
-  const entry = `Phone: ${phone}\nNote: ${note || "-"}\nTime: ${new Date().toISOString()}\n\n`;
-  fs.appendFileSync("data/phones.txt", entry);
-  res.send("Phone number saved.");
+  const log = `📞 Phone: ${phone}\n🕒 Time: ${new Date().toISOString()}\n\n`;
+  fs.appendFileSync("data/phones.txt", log);
+  res.send("📲 شماره ذخیره شد.");
 });
 
-// ذخیره عکس رسید + شماره
+// دریافت و ذخیره عکس رسید
 app.post("/upload", upload.single("receipt"), (req, res) => {
   const { phone } = req.body;
   const file = req.file;
 
-  if (!phone || !file) return res.status(400).send("Phone and image required");
+  if (!phone || !file) return res.status(400).send("شماره و تصویر اجباری است.");
 
-  const logEntry = `Phone: ${phone}\nImage: ${file.filename}\nTime: ${new Date().toISOString()}\n\n`;
-  fs.appendFileSync("data/receipts.txt", logEntry);
-  res.send("Receipt uploaded and saved.");
+  const log = `📞 Phone: ${phone}\n🖼️ Image: ${file.filename}\n🕒 Time: ${new Date().toISOString()}\n\n`;
+  fs.appendFileSync("data/receipts.txt", log);
+
+  res.send("📤 رسید با موفقیت ذخیره شد.");
 });
 
-// مسیر عکس‌ها
+// مسیر عمومی برای دیدن عکس‌ها
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// 📱 نمایش همه شماره‌ها
+// نمایش تمام شماره‌ها
 app.get("/numbers", (req, res) => {
   const filePath = path.join(__dirname, "data", "phones.txt");
-  if (!fs.existsSync(filePath)) return res.send("هیچ شماره‌ای ثبت نشده.");
+  if (!fs.existsSync(filePath)) return res.send("📭 هیچ شماره‌ای ذخیره نشده.");
   const data = fs.readFileSync(filePath, "utf-8");
   res.type("text/plain").send(data);
 });
 
-// 🧾 نمایش همه رسیدها
+// نمایش تمام رسیدها
 app.get("/receipts", (req, res) => {
   const filePath = path.join(__dirname, "data", "receipts.txt");
-  if (!fs.existsSync(filePath)) return res.send("هیچ رسیدی ثبت نشده.");
+  if (!fs.existsSync(filePath)) return res.send("📭 هیچ رسیدی ذخیره نشده.");
   const data = fs.readFileSync(filePath, "utf-8");
   res.type("text/plain").send(data);
 });
 
+// اجرای سرور
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Bot backend listening on port ${PORT}`);
+  console.log(`✅ Server is running on port ${PORT}`);
 });
