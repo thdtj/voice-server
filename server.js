@@ -1,71 +1,63 @@
 const express = require("express");
-const multer = require("multer");
 const bodyParser = require("body-parser");
-const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
+const multer = require("multer");
+const TelegramBot = require("node-telegram-bot-api");
 
 const app = express();
-app.use(cors());
+const upload = multer();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// ایجاد پوشه‌ها (در صورت نبود)
-fs.mkdirSync("uploads", { recursive: true });
-fs.mkdirSync("data", { recursive: true });
+// توکن ربات ادمین
+const ADMIN_BOT_TOKEN = "8097601891:AAFBoNMDTbpA_ee0AwRM3vS-1p5_YGCuGao";
+const bot = new TelegramBot(ADMIN_BOT_TOKEN);
 
-// ذخیره رسیدها
-const upload = multer({ dest: "uploads/" });
+// متغیر برای نگه‌داشتن آیدی ادمین
+let adminChatId = null;
 
-// تست سرور
-app.get("/", (req, res) => {
-  res.send("✅ Bot backend server is running.");
+// ثبت آیدی ادمین وقتی استارت می‌زند (مستقیم در کد ربات هم ثبت می‌شه اما اینجا برای اطمینان)
+app.post("/set-admin", (req, res) => {
+  const { chat_id } = req.body;
+  if (!chat_id) return res.status(400).send("chat_id missing");
+  adminChatId = chat_id;
+  res.send("✅ Admin registered");
 });
 
-// دریافت و ذخیره شماره تلفن
+// دریافت شماره و ارسال مستقیم برای ربات ادمین
 app.post("/submit", (req, res) => {
   const { phone } = req.body;
-  if (!phone) return res.status(400).send("Phone number is required");
+  if (!phone || !adminChatId) return res.status(400).send("Missing phone/admin");
 
-  const log = `📞 Phone: ${phone}\n🕒 Time: ${new Date().toISOString()}\n\n`;
-  fs.appendFileSync("data/phones.txt", log);
-  res.send("📲 شماره ذخیره شد.");
+  const message = `📞 شماره جدید ثبت شد:\n${phone}`;
+  bot.sendMessage(adminChatId, message);
+  res.send("✅ شماره ارسال شد به ادمین");
 });
 
-// دریافت و ذخیره عکس رسید
+// دریافت رسید و ارسال مستقیم به ادمین
 app.post("/upload", upload.single("receipt"), (req, res) => {
   const { phone } = req.body;
   const file = req.file;
+  if (!file || !adminChatId) return res.status(400).send("Missing file/admin");
 
-  if (!phone || !file) return res.status(400).send("شماره و تصویر اجباری است.");
+  const fileBuffer = file.buffer;
+  const caption = `📤 رسید دریافتی\n📞 شماره: ${phone || "نامشخص"}`;
 
-  const log = `📞 Phone: ${phone}\n🖼️ Image: ${file.filename}\n🕒 Time: ${new Date().toISOString()}\n\n`;
-  fs.appendFileSync("data/receipts.txt", log);
+  bot.sendPhoto(adminChatId, fileBuffer, {
+    caption,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ تأیید و ارسال کانفیگ", callback_data: phone || "unknown" }
+        ]
+      ]
+    }
+  });
 
-  res.send("📤 رسید با موفقیت ذخیره شد.");
+  res.send("✅ رسید ارسال شد به ربات ادمین");
 });
 
-// مسیر عمومی برای دیدن عکس‌ها
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// نمایش تمام شماره‌ها
-app.get("/numbers", (req, res) => {
-  const filePath = path.join(__dirname, "data", "phones.txt");
-  if (!fs.existsSync(filePath)) return res.send("📭 هیچ شماره‌ای ذخیره نشده.");
-  const data = fs.readFileSync(filePath, "utf-8");
-  res.type("text/plain").send(data);
-});
-
-// نمایش تمام رسیدها
-app.get("/receipts", (req, res) => {
-  const filePath = path.join(__dirname, "data", "receipts.txt");
-  if (!fs.existsSync(filePath)) return res.send("📭 هیچ رسیدی ذخیره نشده.");
-  const data = fs.readFileSync(filePath, "utf-8");
-  res.type("text/plain").send(data);
-});
-
-// اجرای سرور
+// اجرا روی پورت مشخص
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Server is running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
